@@ -1,6 +1,6 @@
 // src/components/FormField.js
 import React from 'react';
-import { TextField } from '@mui/material';
+import { TextField, InputAdornment, IconButton } from '@mui/material'; // הוספנו ייבואים
 
 /**
  * רכיב גנרי עבור שדה קלט בטופס.
@@ -11,7 +11,8 @@ import { TextField } from '@mui/material';
  * @param {any} value - הערך הנוכחי של השדה (נשלט על ידי ה-state של הרכיב האב).
  * @param {function} onChange - פונקציה שתופעל בכל פעם שהערך בשדה משתנה.
  */
-const FormField = ({ label, type = 'text', name, value, onChange, error = null, helperText = '' }) => {
+const FormField = ({ label, type = 'text', name, value, onChange, error = null,
+     helperText = '',endAdornment }) => {
   return (
     <TextField
       // Props שקיבלנו מהאב
@@ -23,6 +24,14 @@ const FormField = ({ label, type = 'text', name, value, onChange, error = null, 
             // Props חדשים להצגת שגיאות
       error={error} // מקבל true או false
       helperText={helperText} // הטקסט שיוצג מתחת לשדה
+    
+      InputProps={{
+        endAdornment: endAdornment && (
+          <InputAdornment position="end">
+            {endAdornment}
+          </InputAdornment>
+        )
+      }}
 
       // הגדרות עיצוב קבועות שאנחנו רוצים בכל שדה
       variant="outlined"
