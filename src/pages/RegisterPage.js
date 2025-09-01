@@ -6,6 +6,8 @@ import api from '../api/axiosConfig';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
+import { useNavigate } from 'react-router-dom'; // <-- 1. ייבוא
+
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
     fullName: '',
@@ -17,6 +19,8 @@ const RegisterPage = () => {
   const [apiError, setApiError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  const navigate = useNavigate(); // <-- 2. אתחול ה-Hook
   
   const handleClickShowPassword = () => setShowPassword((show) => !show);
   const handleMouseDownPassword = (event) => event.preventDefault();
@@ -56,8 +60,12 @@ const RegisterPage = () => {
       try {
         const response = await api.post('/api/auth/register', formData);
         console.log('Registration successful:', response.data);
-        setSuccessMessage('ההרשמה בוצעה בהצלחה! כעת תוכל להתחבר.');
+        setSuccessMessage('ההרשמה בוצעה בהצלחה! כעת תועבר לדף ההתחברות.');
         setFormData({ fullName: '', email: '', password: '' });
+        // 3. ניווט אוטומטי לאחר השהייה קצרה
+      setTimeout(() => {
+        navigate('/login');
+      }, 2000); // השהייה של 2 שניות כדי שהמשתמש יספיק לקרוא את ההודעה
       } catch (error) {
         console.error('Registration failed:', error);
         if (error.response && error.response.data) {

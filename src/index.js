@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './index.css';
+import { AuthProvider } from './context/AuthContext'; // <-- 2. ייבוא ה-Provider שלנו
 
 // 1. ייבוא הכלים הדרושים מ-MUI ומהספרייה שהתקנו
 import { ThemeProvider, createTheme } from '@mui/material/styles';
@@ -31,7 +32,9 @@ root.render(
     <CacheProvider value={cacheRtl}>
       <ThemeProvider theme={theme}>
         <BrowserRouter>
+         <AuthProvider> {/* <-- עטיפה עם ה-Provider */}
           <App />
+         </AuthProvider>
         </BrowserRouter>
       </ThemeProvider>
     </CacheProvider>
