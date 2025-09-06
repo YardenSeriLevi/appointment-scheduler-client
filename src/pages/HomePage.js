@@ -1,43 +1,24 @@
 // src/pages/HomePage.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axiosConfig';
 
 // ייבוא רכיבים מ-MUI
-import { Box, Typography, Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert } from '@mui/material';
+import { Box, Typography, Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert, Button, Grid } from '@mui/material';
 
-// ייבוא רכיבים מספריית לוח השנה
-import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
-import format from 'date-fns/format';
-import parse from 'date-fns/parse';
-import startOfWeek from 'date-fns/startOfWeek';
-import getDay from 'date-fns/getDay';
-import he from 'date-fns/locale/he'; // ייבוא לוקליזציה לעברית
-import 'react-big-calendar/lib/css/react-big-calendar.css'; // ייבוא העיצוב של לוח השנה
-
-// הגדרת הלוקליזציה של לוח השנה לעברית
-const locales = {
-  'he': he,
-};
-const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 0 }), // שבוע מתחיל ביום ראשון
-  getDay,
-  locales,
-});
+// ייבוא פונקציות עזר לעבודה עם תאריכים
+import { format } from 'date-fns';
+import { he } from 'date-fns/locale';
 
 const HomePage = () => {
   const { isAuthenticated } = useAuth();
-
-  // ניהול מצב (State)
   const [services, setServices] = useState([]);
   const [selectedServiceId, setSelectedServiceId] = useState('');
-  const [availableSlots, setAvailableSlots] = useState([]);
+  const [availableSlots, setAvailableSlots] = useState([]); // עדיין מחזיק את הרשימה השטוחה מה-API
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // שליפת רשימת השירותים מהשרת כשהרכיב נטען
+  // שליפת השירותים (נשאר זהה)
   useEffect(() => {
     const fetchServices = async () => {
       try {
@@ -52,46 +33,21 @@ const HomePage = () => {
         setIsLoading(false);
       }
     };
-
     fetchServices();
   }, []);
 
-  // שליפת זמינות כאשר המשתמש בוחר שירות
+  // שליפת הזמינות (נשאר זהה)
   useEffect(() => {
     if (!selectedServiceId) {
-      setAvailableSlots([]); // איפוס תורים קודמים אם מבטלים בחירת שירות
+      setAvailableSlots([]);
       return;
     }
-
     const fetchAvailability = async () => {
       try {
         setIsLoading(true);
         setError('');
         const response = await api.get(`/api/provider/availability?serviceId=${selectedServiceId}`);
-        
-        // מציאת אובייקט השירות המלא כדי לדעת את משך הזמן שלו
-        const selectedService = services.find(s => s.id.toString() === selectedServiceId.toString());
-        if (!selectedService) {
-            console.warn("Selected service not found in the services list.");
-            return;
-        }
-
-        // המרת מערך מחרוזות התאריכים למבנה הנכון של לוח השנה
-        const formattedSlots = response.data.map(startTimeStr => {
-          const startTime = new Date(startTimeStr);
-          
-          // חישוב זמן הסיום על ידי הוספת משך השירות (בדקות) לזמן ההתחלה
-          const endTime = new Date(startTime.getTime() + selectedService.durationInMinutes * 60000);
-          
-          return {
-            title: selectedService.name, // נציג את שם השירות על האירוע
-            start: startTime,
-            end: endTime,
-          };
-        });
-           debugger; 
-        setAvailableSlots(formattedSlots);
-
+        setAvailableSlots(response.data);
       } catch (err) {
         setError('שגיאה בטעינת זמנים פנויים.');
         console.error("Failed to fetch availability:", err);
@@ -99,22 +55,35 @@ const HomePage = () => {
         setIsLoading(false);
       }
     };
-
     fetchAvailability();
-  }, [selectedServiceId, services]); // הוספנו את services כתלות
+  }, [selectedServiceId]);
 
-  // פונקציה שתופעל כאשר המשתמש ילחץ על משבצת זמן
-  const handleSelectSlot = (slotInfo) => {
-    console.log('Selected slot:', slotInfo);
-    alert(`בחרת תור בתאריך: ${slotInfo.start.toLocaleString('he-IL')}`);
-    // בהמשך נוסיף כאן את הלוגיקה לקביעת התור עם חלון דיאלוג
+  // Hook חדש לעיבוד וקיבוץ התורים לפי יום
+  const groupedSlots = useMemo(() => {
+    if (!availableSlots.length) return {};
+
+    // שימוש ב-reduce כדי לקבץ את המערך לאובייקט
+    return availableSlots.reduce((acc, slotStr) => {
+      const date = new Date(slotStr);
+      const dayKey = format(date, 'yyyy-MM-dd'); // יצירת מפתח ייחודי לכל יום
+
+      if (!acc[dayKey]) {
+        acc[dayKey] = []; // אם זה היום הראשון שאנחנו פוגשים, ניצור עבורו מערך ריק
+      }
+      acc[dayKey].push(date); // הוספת התור למערך של היום המתאים
+      return acc;
+    }, {});
+  }, [availableSlots]); // חישוב מחדש יתבצע רק כאשר availableSlots משתנה
+
+  const handleSelectSlot = (slotDate) => {
+    console.log('Selected slot:', slotDate);
+    alert(`בחרת תור בתאריך: ${slotDate.toLocaleString('he-IL')}`);
+    // כאן נפתח את חלון הדיאלוג
   };
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        קביעת תור חדש
-      </Typography>
+      <Typography variant="h4" gutterBottom>קביעת תור חדש</Typography>
       
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
@@ -136,33 +105,32 @@ const HomePage = () => {
 
       {isLoading && <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress /></Box>}
 
-      <Box sx={{ height: '600px', direction: 'ltr' }}> {/* הוספת direction ltr ליומן עצמו */}
-        <Calendar
-          localizer={localizer}
-          events={availableSlots}
-          startAccessor="start"
-          endAccessor="end"
-          style={{ height: '100%' }}
-          onSelectEvent={handleSelectSlot}
-          culture='he'
-          rtl={true} // הגדרה מפורשת של RTL ליומן
-          messages={{
-            next: "הבא",
-            previous: "הקודם",
-            today: "היום",
-            month: "חודש",
-            week: "שבוע",
-            day: "יום",
-            agenda: "סדר יום",
-            date: "תאריך",
-            time: "שעה",
-            event: "אירוע",
-            noEventsInRange: "אין תורים פנויים בטווח זה."
-          }}
-          defaultView="week" // תצוגת ברירת מחדל
-          min={new Date(0, 0, 0, 8, 0, 0)} // שעת התחלה ביומן (8 בבוקר)
-          max={new Date(0, 0, 0, 20, 0, 0)} // שעת סיום ביומן (8 בערב)
-        />
+      {/* החלק החדש: הצגת רשימת התורים המקובצים */}
+      <Box sx={{ mt: 2 }}>
+        {Object.keys(groupedSlots).length > 0 ? (
+          Object.entries(groupedSlots).map(([dayKey, slots]) => (
+            <Box key={dayKey} sx={{ mb: 4 }}>
+              <Typography variant="h6" sx={{ borderBottom: 1, borderColor: 'divider', pb: 1, mb: 2 }}>
+                {format(new Date(dayKey), "EEEE, d 'ב'LLLL", { locale: he })}
+              </Typography>
+              <Grid container spacing={1}>
+                {slots.map((slot, index) => (
+                  <Grid item xs={4} sm={3} md={2} key={index}>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      onClick={() => handleSelectSlot(slot)}
+                    >
+                      {format(slot, 'HH:mm')}
+                    </Button>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          ))
+        ) : (
+          !isLoading && selectedServiceId && <Typography>אין תורים פנויים עבור השירות שנבחר.</Typography>
+        )}
       </Box>
     </Box>
   );
