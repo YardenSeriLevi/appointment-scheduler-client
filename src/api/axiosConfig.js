@@ -1,11 +1,26 @@
 // src/api/axiosConfig.js
 import axios from 'axios';
 
-// יצירת מופע (instance) של axios עם הגדרות ברירת מחדל
 const api = axios.create({
-  // החליפי את הכתובת לכתובת המדויקת שבה ה-API שלך רץ
-  // לדוגמה: https://localhost:7123
-  baseURL: 'https://localhost:7111' 
+  baseURL: 'https://localhost:7111' // ודאי שזו הכתובת הנכונה
 });
+
+// הוספת "מיירט" (interceptor) שיפעל על כל בקשה יוצאת
+api.interceptors.request.use(
+  (config) => {
+    // 1. קרא את הטוקן מה-localStorage
+    const token = localStorage.getItem('jwt_token');
+    
+    // 2. אם הטוקן קיים, הוסף אותו להידרים
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 export default api;
