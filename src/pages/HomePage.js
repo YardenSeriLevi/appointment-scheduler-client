@@ -4,16 +4,16 @@ import api from '../api/axiosConfig';
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 
-import { 
-    Box, Typography, Select, MenuItem, FormControl, InputLabel, 
-    CircularProgress, Alert, Button, Grid, Dialog, DialogTitle, 
-    DialogContent, DialogActions, TextField 
+import {
+    Box, Typography, Select, MenuItem, FormControl, InputLabel,
+    CircularProgress, Alert, Button, Grid, Dialog, DialogTitle,
+    DialogContent, DialogActions, TextField
 } from '@mui/material';
 
 const HomePage = () => {
     const { isAuthenticated } = useAuth();
     const [services, setServices] = useState([]);
-    const [selectedServiceId, setSelectedServiceId] = useState('');
+    // const [selectedServiceId, setSelectedServiceId] = useState('');
     const [availableSlots, setAvailableSlots] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -24,7 +24,13 @@ const HomePage = () => {
     const [bookingSuccess, setBookingSuccess] = useState(false);
     const [dialogErrors, setDialogErrors] = useState({});
 
-    // שליפת רשימת השירותים - ללא שינוי
+    // ==> שינוי 1: אתחול ה-State מתוך localStorage <==
+    const [selectedServiceId, setSelectedServiceId] = useState(() => {
+        // פונקציה זו תרוץ פעם אחת בלבד כשהרכיב נוצר
+        const savedServiceId = localStorage.getItem('selectedServiceId');
+        return savedServiceId || ''; // החזר את הערך השמור, או מחרוזת ריקה אם אין
+    });
+    // שליפת רשימת השירותים  
     useEffect(() => {
         const fetchServices = async () => {
             try {
@@ -41,7 +47,18 @@ const HomePage = () => {
         fetchServices();
     }, []);
 
-    // שליפת זמינות - ללא שינוי
+    // ==> שינוי 2: הוספת useEffect חדש לשמירת השינויים <==
+    useEffect(() => {
+        // Hook זה ירוץ בכל פעם ש-selectedServiceId משתנה
+        if (selectedServiceId) {
+            // אם יש ID, שמור אותו ב-localStorage
+            localStorage.setItem('selectedServiceId', selectedServiceId);
+        } else {
+            // אם ה-ID ריק (למשל, המשתמש ביטל בחירה), הסר אותו מהאחסון
+            localStorage.removeItem('selectedServiceId');
+        }
+    }, [selectedServiceId]);
+    // שליפת זמינות   
     useEffect(() => {
         if (!selectedServiceId) {
             setAvailableSlots([]);
@@ -50,8 +67,6 @@ const HomePage = () => {
         const fetchAvailability = async () => {
             try {
                 setIsLoading(true);
-                setError('');
-                setSuccessMessage('');
                 const response = await api.get(`/api/provider/availability?serviceId=${selectedServiceId}`);
                 setAvailableSlots(response.data);
             } catch (err) {
@@ -131,7 +146,7 @@ const HomePage = () => {
                 successMsg = `התור עבור ${guestInfo.name} נקבע בהצלחה!`;
             }
             setSuccessMessage(successMsg);
-            
+
             setTimeout(() => setSuccessMessage(''), 5000);
 
             closeModal();
@@ -139,6 +154,13 @@ const HomePage = () => {
         } catch (err) {
             const errorMessage = err.response?.data?.message || err.response?.data || 'שגיאה בקביעת התור.';
             setError(errorMessage);
+            // ==> טיימר להודעת השגיאה<==
+            setTimeout(() => {
+                setError('');
+            }, 5000); // 5 שניות
+            closeModal();
+            setBookingSuccess(prev => !prev);
+
         } finally {
             setIsLoading(false);
         }
@@ -173,25 +195,33 @@ const HomePage = () => {
             {isLoading && <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress /></Box>}
 
             <Box sx={{ mt: 2 }}>
-                {Object.keys(groupedSlots).length > 0 ? (
-                    Object.entries(groupedSlots).map(([dayKey, slots]) => (
-                        <Box key={dayKey} sx={{ mb: 4 }}>
-                            <Typography variant="h6" sx={{ borderBottom: 1, borderColor: 'divider', pb: 1, mb: 2 }}>
-                                {format(parseISO(dayKey), "EEEE, d 'ב'LLLL", { locale: he })}
-                            </Typography>
-                            <Grid container spacing={1}>
-                                {slots.map((slot, index) => (
-                                    <Grid item xs={4} sm={3} md={2} key={index}>
-                                        <Button variant="outlined" fullWidth onClick={() => openBookingModal(slot)}>
-                                            {format(slot, 'HH:mm')}
-                                        </Button>
-                                    </Grid>
-                                ))}
-                            </Grid>
-                        </Box>
-                    ))
-                ) : (
-                    !isLoading && selectedServiceId && <Typography>אין תורים פנויים עבור השירות שנבחר.</Typography>
+                {/* 
+                  אם אנחנו לא במצב טעינה ויש שירות שנבחר, 
+                  אז נבדוק אם יש תורים להציג.
+                */}
+                {!isLoading && selectedServiceId && (
+                    Object.keys(groupedSlots).length > 0 ? (
+                        // אם יש תורים, נציג אותם
+                        Object.entries(groupedSlots).map(([dayKey, slots]) => (
+                            <Box key={dayKey} sx={{ mb: 4 }}>
+                                <Typography variant="h6" sx={{ borderBottom: 1, borderColor: 'divider', pb: 1, mb: 2 }}>
+                                    {format(parseISO(dayKey), "EEEE, d 'ב'LLLL", { locale: he })}
+                                </Typography>
+                                <Grid container spacing={1}>
+                                    {slots.map((slot, index) => (
+                                        <Grid item xs={4} sm={3} md={2} key={index}>
+                                            <Button variant="outlined" fullWidth onClick={() => openBookingModal(slot)}>
+                                                {format(slot, 'HH:mm')}
+                                            </Button>
+                                        </Grid>
+                                    ))}
+                                </Grid>
+                            </Box>
+                        ))
+                    ) : (
+                        // אם אין תורים (אחרי שסיימנו לטעון), נציג הודעה
+                        <Typography>אין תורים פנויים עבור השירות שנבחר.</Typography>
+                    )
                 )}
             </Box>
 
@@ -213,14 +243,14 @@ const HomePage = () => {
                             {!isAuthenticated && (
                                 <Box sx={{ mt: 3 }}>
                                     <Typography variant="h6" gutterBottom>נא למלא פרטים להשלמת ההזמנה:</Typography>
-                                    <TextField 
-                                        autoFocus 
-                                        margin="dense" 
-                                        label="שם מלא" 
-                                        type="text" 
-                                        fullWidth 
+                                    <TextField
+                                        autoFocus
+                                        margin="dense"
+                                        label="שם מלא"
+                                        type="text"
+                                        fullWidth
                                         variant="standard"
-                                        value={guestInfo.name} 
+                                        value={guestInfo.name}
                                         onChange={(e) => {
                                             setGuestInfo({ ...guestInfo, name: e.target.value });
                                             if (dialogErrors.name) setDialogErrors({ ...dialogErrors, name: '' });
@@ -228,12 +258,12 @@ const HomePage = () => {
                                         error={!!dialogErrors.name}
                                         helperText={dialogErrors.name}
                                     />
-                                    <TextField 
-                                        margin="dense" 
-                                        label="מספר טלפון" 
-                                        type="tel" 
-                                        fullWidth 
-                                        variant="standard" 
+                                    <TextField
+                                        margin="dense"
+                                        label="מספר טלפון"
+                                        type="tel"
+                                        fullWidth
+                                        variant="standard"
                                         value={guestInfo.phone}
                                         onChange={(e) => {
                                             setGuestInfo({ ...guestInfo, phone: e.target.value });
